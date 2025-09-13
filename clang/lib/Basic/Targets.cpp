@@ -21,6 +21,7 @@
 #include "Targets/BPF.h"
 #include "Targets/CSKY.h"
 #include "Targets/DirectX.h"
+#include "Targets/H2BLB.h"
 #include "Targets/Hexagon.h"
 #include "Targets/Lanai.h"
 #include "Targets/LoongArch.h"
@@ -44,6 +45,7 @@
 #include "clang/Basic/DiagnosticFrontend.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/TargetParser/Triple.h"
+#include <memory>
 
 using namespace clang;
 
@@ -121,6 +123,9 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
 
   case llvm::Triple::xcore:
     return std::make_unique<XCoreTargetInfo>(Triple, Opts);
+
+  case llvm::Triple::h2blb:
+    return std::make_unique<H2BLBTargetInfo>(Triple, Opts);
 
   case llvm::Triple::hexagon:
     if (os == llvm::Triple::Linux &&
