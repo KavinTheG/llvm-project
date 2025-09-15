@@ -58,6 +58,7 @@
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Type.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/Compiler.h"
@@ -3480,6 +3481,36 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
         break;
     }
     break;
+  case ISD::VECTOR_COMPRESS: {
+    assert(!Op.getValueType().isScalableVector());
+
+    Known.Zero.setAllBits();
+    Known.One.setAllBits();
+    SDValue Vec = Op.getOperand(0);
+    SDValue Mask = Op.getOperand(1);
+    SDValue PassThru = Op.getOperand(2);
+    if (PassThru.isUndef()) {
+      Known.resetAll();
+      break;
+    }
+
+    APInt MaskBits(NumElts, 0);
+    unsigned MaskNumElts = Mask.getValueType().getVectorNumElements();
+    for (unsigned i = 0; i != MaskNumElts; ++i){
+      if (auto *CMask = dyn_cast<ConstantSDNode>(Mask.getOperand(i))) {
+        if (CMask->isOne())
+          MaskBits.setBit(i);
+      }
+    } 
+    APInt VecElts = MaskBits;
+    APInt PassThruElts = ~MaskBits;
+
+    Known2 = computeKnownBits(Vec, VecElts, Depth + 1);
+    Known = Known.intersectWith(Known2);
+    Known2 = computeKnownBits(PassThru, PassThruElts, Depth + 1);
+    Known = Known.intersectWith(Known2);
+    break;
+  }
   case ISD::VECTOR_SHUFFLE: {
     assert(!Op.getValueType().isScalableVector());
     // Collect the known bits that are shared by every vector element referenced
@@ -4791,6 +4822,20 @@ unsigned SelectionDAG::ComputeNumSignBits(SDValue Op, const APInt &DemandedElts,
       Tmp = std::min(Tmp, Tmp2);
     }
     return Tmp;
+
+  case ISD::VECTOR_COMPRESS: {
+    SDValue Vec = Op.getOperand(0);
+    SDValue PassThru = Op.getOperand(2);
+    
+    // If PassThru is undefined, early out return 1.
+    if (PassThru.isUndef())
+      return 1;
+    Tmp = ComputeNumSignBits(Vec, Depth + 1);
+    Tmp2 = ComputeNumSignBits(PassThru, Depth + 1);
+
+    Tmp = std::min(Tmp, Tmp2);
+    return Tmp;
+  }
 
   case ISD::VECTOR_SHUFFLE: {
     // Collect the minimum number of sign bits that are shared by every vector

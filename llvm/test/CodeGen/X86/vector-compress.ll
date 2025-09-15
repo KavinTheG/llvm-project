@@ -4448,6 +4448,15 @@ define <4 x i32> @test_compress_all_const() nounwind {
     ret <4 x i32> %out
 }
 
+define <8 x i32> @test_compress_knownbits(<8 x i32> %vec, <8 x i1> %mask) nounwind {
+; CHECK-LABEL: test_compress_knownbits:
+; AVX512F:       vpcompressd
+; AVX512VL:      vpcompressd
+; AVX2-NOT:      vpcompressd
+  %out = call <8 x i32> @llvm.experimental.vector.compress(<8 x i32> %vec, <8 x i1> %mask, <8 x i32> undef)
+  ret <8 x i32> %out
+}
+
 define <4 x i32> @test_compress_const_mask(<4 x i32> %vec) nounwind {
 ; CHECK-LABEL: test_compress_const_mask:
 ; CHECK:       # %bb.0:
