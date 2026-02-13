@@ -40,6 +40,25 @@ body: |
     $v9 = COPY %z
 ...
 ---
+name: vredsum_vv_reduce_input
+body: |
+  bb.0:
+    liveins: $x1
+    ; CHECK-LABEL: name: vredsum_vv_reduce_input
+    ; CHECK: liveins: $x1
+    ; CHECK-NEXT: {{  $}}
+    ; CHECK-NEXT: %vl:gprnox0 = COPY $x1
+    ; CHECK-NEXT: %x:vr = PseudoVADD_VV_M1 $noreg, $noreg, $noreg, 3 /* vl */, 6 /* e64 */, 1 /* ta, mu */
+    ; CHECK-NEXT: %y:vr = PseudoVADD_VV_M1 $noreg, $noreg, $noreg, 1 /* vl */, 6 /* e64 */, 1 /* ta, mu */
+    ; CHECK-NEXT: %z:vr = PseudoVREDSUM_VS_M1_E64 $noreg, %x, %y, 3 /* vl */, 6 /* e64 */, 1 /* ta, mu */
+    ; CHECK-NEXT: $v8 = COPY %z
+    %vl:gprnox0 = COPY $x1
+    ; Change policy to 1 (Agnostic) and SEW to match reduction if possible
+    %x:vr = PseudoVADD_VV_M1 $noreg, $noreg, $noreg, -1, 6 /* e64 */, 1 /* ta, ma */
+    %y:vr = PseudoVADD_VV_M1 $noreg, $noreg, $noreg, -1, 6 /* e64 */, 1 /* ta, ma */
+    %z:vr = PseudoVREDSUM_VS_M1_E64 $noreg, %x, %y, 3, 6 /* e64 */, 1 /* ta, ma */
+    $v8 = COPY %z
+...
 name: use_largest_common_vl_imm_imm
 body: |
   bb.0:

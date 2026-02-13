@@ -1428,6 +1428,43 @@ getMinimumVLForVSLIDEDOWN_VX(const MachineOperand &UserOp,
   return SlideAmtDef->getOperand(1);
 }
 
+static std::optional<DemandedVL>
+getMinimumVLForVRED(const MachineOperand &UserOp,
+                    const MachineRegisterInfo *MRI) {
+  const MachineInstr &MI = *UserOp.getParent();
+  const RISCVVPseudosTable::PseudoInfo *RVV =
+      RISCVVPseudosTable::getPseudoInfo(MI.getOpcode());
+
+  if (!RVV)
+    return std::nullopt;
+
+  switch (RVV->BaseInstr) {
+  case RISCV::VREDAND_VS:
+  case RISCV::VREDMAX_VS:
+  case RISCV::VREDMAXU_VS:
+  case RISCV::VREDMIN_VS:
+  case RISCV::VREDMINU_VS:
+  case RISCV::VREDOR_VS:
+  case RISCV::VREDSUM_VS:
+  case RISCV::VREDXOR_VS:
+  case RISCV::VWREDSUM_VS:
+  case RISCV::VWREDSUMU_VS:
+  case RISCV::VFREDMAX_VS:
+  case RISCV::VFREDMIN_VS:
+  case RISCV::VFREDOSUM_VS:
+  case RISCV::VFREDUSUM_VS:
+  case RISCV::VFWREDOSUM_VS:
+  case RISCV::VFWREDUSUM_VS:
+    if (UserOp.getOperandNo() == 2) 
+      return MI.getOperand(RISCVII::getVLOpNum(MI.getDesc()));
+    else if (UserOp.getOperandNo() == 3)
+      return MachineOperand::CreateImm(1);
+    [[fallthrough]];
+  default:
+    return std::nullopt;
+  }
+}
+
 DemandedVL
 RISCVVLOptimizer::getMinimumVLForUser(const MachineOperand &UserOp) const {
   const MachineInstr &UserMI = *UserOp.getParent();
@@ -1443,6 +1480,9 @@ RISCVVLOptimizer::getMinimumVLForUser(const MachineOperand &UserOp) const {
   }
 
   if (auto VL = getMinimumVLForVSLIDEDOWN_VX(UserOp, MRI))
+    return *VL;
+
+  if (auto VL = getMinimumVLForVRED(UserOp, MRI))
     return *VL;
 
   if (RISCVII::readsPastVL(
